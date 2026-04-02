@@ -2,8 +2,11 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "your-dockerhub-username/app"
+        IMAGE_NAME = "edwinaabah/cicd-automation"
         IMAGE_TAG  = "build-${BUILD_NUMBER}"
+
+        
+        SNS_TOPIC_ARN = "arn:aws:sns:eu-central-1:506993645576:JenkinsPipelineNotifications"
     }
 
     stages {
@@ -13,29 +16,39 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                sh "docker build --pull -t ${IMAGE_NAME}:${IMAGE_TAG} ."
             }
         }
 
-        stage('Push') {
+        stage('Push to DockerHub') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-credentials',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    '''
                     sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
                 }
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy to EC2 App Server') {
             steps {
-                // Replace with your EC2 host and key credential
-                sh "ssh -o StrictHostKeyChecking=no ec2-user@your-ec2-ip 'docker pull ${IMAGE_NAME}:${IMAGE_TAG} && docker stop app || true && docker rm app || true && docker run -d --name app -p 80:80 ${IMAGE_NAME}:${IMAGE_TAG}'"
+                sshagent(['app-server-ssh-key']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ubuntu@63.178.45.75 '
+                            docker pull ${IMAGE_NAME}:${IMAGE_TAG} &&
+                            docker stop app || true &&
+                            docker rm app || true &&
+                            docker run -d --restart unless-stopped --name app -p 80:80 ${IMAGE_NAME}:${IMAGE_TAG}
+                        '
+                    """
+                }
             }
         }
     }
