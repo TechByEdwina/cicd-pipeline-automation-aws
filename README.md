@@ -38,3 +38,6 @@ Before using the pipeline, update the following in the Jenkinsfile:
 - `your-dockerhub-username/app` with your actual DockerHub repo
 - `your-ec2-ip` with your EC2 instance's public IP
 - Add a Jenkins credential with ID `dockerhub-credentials`
+
+- Author:
+  TechbyEdwina
