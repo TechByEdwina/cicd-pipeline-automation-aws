@@ -5,11 +5,12 @@ pipeline {
         IMAGE_NAME = "edwinaabah/cicd-automation"
         IMAGE_TAG  = "build-${BUILD_NUMBER}"
 
-        
+        // SNS Topic ARN
         SNS_TOPIC_ARN = "arn:aws:sns:eu-central-1:506993645576:JenkinsPipelineNotifications"
     }
 
     stages {
+
         stage('Clone') {
             steps {
                 checkout scm
@@ -50,6 +51,26 @@ pipeline {
                     """
                 }
             }
+        }
+
+        stage('Notify Success') {
+            steps {
+                sh """
+                    aws sns publish \
+                        --topic-arn "${SNS_TOPIC_ARN}" \
+                        --message "Deployment successful for Build #${BUILD_NUMBER}"
+                """
+            }
+        }
+    }
+
+    post {
+        failure {
+            sh """
+                aws sns publish \
+                    --topic-arn "${SNS_TOPIC_ARN}" \
+                    --message "Deployment failed for Build #${BUILD_NUMBER}"
+            """
         }
     }
 }
